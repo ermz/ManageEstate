@@ -1,9 +1,28 @@
 # @version >=0.2.7 <0.3.0
 
+# from vyper.interfaces import ERC721
+
+# implements: ERC721
+
+event EtherTransfer:
+    sender: indexed(address)
+    receiver: indexed(address)
+    amount: uint256
+
 event Transfer:
     sender: indexed(address)
     receiver: indexed(address)
     amount: uint256
+
+event Approval:
+    owner: indexed(address)
+    approved: indexed(address)
+    tokenId: indexed(uint256)
+
+event ApprovalForAll:
+    owner: indexed(address)
+    operator: indexed(address)
+    approved: bool
 
 event LeaseApproved:
     landlord: indexed(address)
@@ -45,10 +64,93 @@ brokerApprove: HashMap[address, HashMap[address, bool]]
 # Agent's can only have one broker
 agentLedger: HashMap[address, address]
 
+subtenantLedger: HashMap[uint256, HashMap[address, uint256]]
+
+# ERC721 storage variables
+idToOwner: HashMap[uint256, address]
+idToApprovals: HashMap[uint256, address]
+ownerToNFTokenCount: HashMap[address, uint256]
+ownerToOperators: HashMap[address, HashMap[address, bool]]
+minter: address
+supportedInterfaces: HashMap[bytes32, bool]
+ERC165_INTERFACE_ID: constant(bytes32) = 0x0000000000000000000000000000000000000000000000000000000001ffc9a7
+ERC721_INTERFACE_ID: constant(bytes32) = 0x0000000000000000000000000000000000000000000000000000000080ac58cd
+
 @external
 def __init__():
     self.admin = msg.sender
+    self.minter = msg.sender
     self.propertyId = 1
+    self.supportedInterfaces[ERC165_INTERFACE_ID] = True
+    self.supportedInterfaces[ERC721_INTERFACE_ID] = True
+
+#ERC721 functions
+@view
+@external
+def supportsInterface(_interfaceID: bytes32) -> bool:
+    return self.supportedInterfaces[_interfaceID]
+
+@view
+@external
+def balanceOf(_owner: address) -> uint256:
+    assert _owner != ZERO_ADDRESS
+    return self.ownerToNFTokenCount[_owner]
+
+@view
+@external
+def ownerOf(_tokenId: uint256) -> address:
+    owner: address = self.idToOwner[_tokenId]
+    assert owner != ZERO_ADDRESS
+    return owner
+
+@view
+@external
+def getApproved(_tokenId: uint256) -> address:
+    assert self.idToOwner[_tokenId] != ZERO_ADDRESS
+    return self.idToApprovals[_tokenId]
+
+@view
+@external
+def isApprovedForAll(_owner: address, _operator: address) -> bool:
+    return (self.ownerToOperators[_owner])[_operator]
+
+@view
+@internal
+def _isApprovedOrOwner(_spender: address, _tokenId: uint256) -> bool:
+    owner: address = self.idToOwner[_tokenId]
+    spenderIsOwner: bool = owner == _spender
+    spenderIsApproved: bool = _spender == self.idToApprovals[_tokenId]
+    spenderIsApprovedForAll: bool = (self.ownerToOperators[owner])[_spender]
+    return (spenderIsOwner or spenderIsApproved) or spenderIsApprovedForAll
+
+@internal
+def _addTokenTo(_to: address, _tokenId: uint256):
+    assert self.idToOwner[_tokenId] == ZERO_ADDRESS
+    self.idToOwner[_tokenId] = _to
+    self.ownerToNFTokenCount[_to] += 1
+
+@internal
+def _removeTokenFrom(_from: address, _tokenId: uint256):
+    assert self.idToOwner[_tokenId] == _from
+    self.idToOwner[_tokenId] = ZERO_ADDRESS
+    self.ownerToNFTokenCount[_from] -= 1
+
+@internal
+def _clearApproval(_owner: address, _tokenId: uint256):
+    assert self.idToOwner[_tokenId] == _owner
+    if self.idToApprovals[_tokenId] != ZERO_ADDRESS:
+        self.idToApprovals[_tokenId] = ZERO_ADDRESS
+
+@internal
+def _transferFrom(_from: address, _to: address, _tokenId: uint256, _sender: address):
+    assert self._isApprovedOrOwner(_sender, _tokenId)
+    assert _to != ZERO_ADDRESS
+    self._clearApproval(_from, _tokenId)
+    self._removeTokenFrom(_from, _tokenId)
+    self._addTokenTo(_to, _tokenId)
+    log Transfer(_from, _to, _tokenId)
+
+    
 
 @external
 def addLandlord(addr: address):
@@ -112,7 +214,7 @@ def applyAsTenant(_propertyId: uint256, _startDate: uint256, _monthsFree: uint25
         broker: ZERO_ADDRESS,
         brokerFee: 0
     })
-    log Transfer(msg.sender, self, msg.value)
+    log EtherTransfer(msg.sender, self, msg.value)
 
 @payable
 @external
@@ -130,6 +232,7 @@ def applyAsBroker(_propertyId: uint256, _startDate: uint256, _monthsFree: uint25
         broker: msg.sender,
         brokerFee: _brokerFee
     })
+    log EtherTransfer(msg.sender, self, msg.value)
 
 @view
 @external
@@ -145,37 +248,43 @@ def approveApplication(_propertyId: uint256):
     # The security deposit is held until the end, for either security or given back
     send(msg.sender, as_wei_value(self.propertyLedger[_propertyId].rent, "ether"))
     
-    log Transfer(self, self.propertyLedger[_propertyId].owner, self.propertyLedger[_propertyId].rent)
+    log EtherTransfer(self, self.propertyLedger[_propertyId].owner, self.propertyLedger[_propertyId].rent)
     log LeaseApproved(self.propertyLedger[_propertyId].owner, self.applicationLedger[_propertyId].tenant, block.timestamp)
 
 @external
 def withdrawBrokerFee(_propertyId: uint256):
     property_application: Application = self.applicationLedger[_propertyId]
     assert property_application.broker == msg.sender
-    assert property_application.brokerFee > 0
+    assert property_application.brokerFee > 0, "Nothing to collect or already collected"
     assert property_application.approved == True
     assert property_application.startDate <= block.timestamp, "You can only withdraw funds once tenants have moved into their new unit"
     send(msg.sender, as_wei_value(property_application.brokerFee, "ether"))
-    log Transfer(self, msg.sender, property_application.brokerFee)
+    self.applicationLedger[_propertyId].brokerFee = 0
+    log EtherTransfer(self, msg.sender, property_application.brokerFee)
 
 @external
 def withdrawSecurityDeposit(_propertyId: uint256):
     property_application: Application = self.applicationLedger[_propertyId]
-    assert property_application.tenant == msg.sender
+    assert property_application.tenant == msg.sender, "You are either no the tenant or you already collected you security deposit"
     assert property_application.approved == True
     assert property_application.startDate + property_application.length <= block.timestamp, "You can only withdraw your deposit once you're lease is up"
     send(msg.sender, as_wei_value(self.propertyLedger[_propertyId].rent, "ether"))
-    log Transfer(self, msg.sender, self.propertyLedger[_propertyId].rent)
+    self.applicationLedger[_propertyId].tenant = ZERO_ADDRESS
+    log EtherTransfer(self, msg.sender, self.propertyLedger[_propertyId].rent)
 
 
-# @external
-# def subletRental(_propertyId: uint256, newTenant: address, length: address):
-
+@external
+def subletRental(_propertyId: uint256, _newTenant: address, _length: uint256):
+    property_application: Application = self.applicationLedger[_propertyId]
+    assert property_application.tenant == msg.sender
+    assert property_application.approved == True
+    assert property_application.startDate + property_application.length > block.timestamp + _length, "Sublease length must be less than the total time of original lease"
+    self.subtenantLedger[_propertyId][_newTenant] = _length
 
 @payable
 @external
 def payRent(_propertyId: uint256):
-    assert self.propertyLedger[_propertyId].tenant == msg.sender, "You are not renting this unit"
+    assert self.propertyLedger[_propertyId].tenant == msg.sender or self.subtenantLedger[_propertyId][msg.sender] > 0, "You are not renting this unit or subleasing this unit"
     assert as_wei_value(self.propertyLedger[_propertyId].rent, "ether") <= msg.value, "You aren't sending enough to cover rent"
     send(self.propertyLedger[_propertyId].owner, as_wei_value(self.propertyLedger[_propertyId].rent, "ether"))
-    log Transfer(msg.sender, self.propertyLedger[_propertyId].owner, msg.value)
+    log EtherTransfer(msg.sender, self.propertyLedger[_propertyId].owner, msg.value)
