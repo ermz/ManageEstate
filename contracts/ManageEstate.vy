@@ -4,6 +4,14 @@
 
 # implements: ERC721
 
+interface ERC721Receiver:
+    def onERC721Received(
+        _operator: address,
+        _from: address,
+        _tokenId: uint256,
+        _data: Bytes[1024]
+    ) -> bytes32: view
+
 event EtherTransfer:
     sender: indexed(address)
     receiver: indexed(address)
@@ -149,6 +157,55 @@ def _transferFrom(_from: address, _to: address, _tokenId: uint256, _sender: addr
     self._removeTokenFrom(_from, _tokenId)
     self._addTokenTo(_to, _tokenId)
     log Transfer(_from, _to, _tokenId)
+
+
+@external
+def transferFrom(_from: address, _to: address, _tokenId: uint256):
+    self._transferFrom(_from, _to, _tokenId, msg.sender)
+
+@external
+def safeTransferFrom(_from: address, _to: address, _tokenId: uint256, _data: Bytes[1024]=b""):
+    self._transferFrom(_from, _to, _tokenId, msg.sender)
+    if _to.is_contract:
+        returnValue: bytes32 = ERC721Receiver(_to).onERC721Received(msg.sender, _from, _tokenId, _data)
+        assert returnValue == method_id("onERC721Received(address,address,uint256,bytes)", output_type=bytes32)
+
+@external
+def approve(_approved: address, _tokenId: uint256):
+    owner: address = self.idToOwner[_tokenId]
+    assert owner != ZERO_ADDRESS
+    assert _approved != owner
+    senderIsOwner: bool = self.idToOwner[_tokenId] == msg.sender
+    senderIsApprovedForAll: bool = (self.ownerToOperators[owner])[msg.sender]
+    assert (senderIsOwner or senderIsApprovedForAll)
+    self.idToApprovals[_tokenId] = _approved
+    log Approval(owner, _approved, _tokenId)
+
+
+@external
+def setApprovalForAll(_operator: address, _approved: bool):
+    assert _operator != msg.sender
+    self.ownerToOperators[msg.sender][_operator] = _approved
+    log ApprovalForAll(msg.sender, _operator, _approved)
+
+
+@external
+def mint(_to: address, _tokenId: uint256) -> bool:
+    assert msg.sender == self.minter
+    assert _to != ZERO_ADDRESS
+    self._addTokenTo(_to, _tokenId)
+    log Transfer(ZERO_ADDRESS, _to, _tokenId)
+    return True
+
+
+@external
+def burn(_tokenId: uint256):
+    assert self._isApprovedOrOwner(msg.sender, _tokenId)
+    owner: address = self.idToOwner[_tokenId]
+    assert owner != ZERO_ADDRESS
+    self._clearApproval(owner, _tokenId)
+    self._removeTokenFrom(owner, _tokenId)
+    log Transfer(owner, ZERO_ADDRESS, _tokenId)
 
     
 
