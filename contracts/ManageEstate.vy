@@ -43,6 +43,7 @@ struct Property:
     rent: uint256
     owner: address
     tenant: address
+    price: uint256
 
 struct Application:
     tenant: address
@@ -92,7 +93,7 @@ def __init__():
     self.supportedInterfaces[ERC165_INTERFACE_ID] = True
     self.supportedInterfaces[ERC721_INTERFACE_ID] = True
 
-#ERC721 functions
+# ERC721 functions
 @view
 @external
 def supportsInterface(_interfaceID: bytes32) -> bool:
@@ -188,7 +189,7 @@ def setApprovalForAll(_operator: address, _approved: bool):
     self.ownerToOperators[msg.sender][_operator] = _approved
     log ApprovalForAll(msg.sender, _operator, _approved)
 
-
+# Shouldn't need to use this function at all
 @external
 def mint(_to: address, _tokenId: uint256) -> bool:
     assert msg.sender == self.minter
@@ -207,6 +208,7 @@ def burn(_tokenId: uint256):
     self._removeTokenFrom(owner, _tokenId)
     log Transfer(owner, ZERO_ADDRESS, _tokenId)
 
+# End of ERC721 functions
     
 
 @external
@@ -227,9 +229,40 @@ def addProperty(_direction: String[50], _unit: String[10], _rent: uint256):
         unit: _unit,
         rent: _rent,
         owner: msg.sender,
-        tenant: ZERO_ADDRESS
+        tenant: ZERO_ADDRESS,
+        price: 0
     })
     self.propertyId += 1
+
+# Callable only by property owners already
+@internal
+def _mintProperty(_to: address, _tokenId: uint256) -> bool:
+    assert _to != ZERO_ADDRESS
+    self._addTokenTo(_to, _tokenId)
+    log Transfer(ZERO_ADDRESS, _to, _tokenId)
+    return True 
+
+# PropertyId to Address and Percentage they own
+propertyPercentage: HashMap[uint256, HashMap[address, uint256]]
+propertyForSale: HashMap[uint256, bool]
+
+@external
+def makePropertySellable(_propertyId: uint256, _price: uint256):
+    assert self.propertyLedger[_propertyId].price == 0, "This property is already up for sale"
+    assert self.propertyLedger[_propertyId].owner == msg.sender
+    assert self.propertyLedger[_propertyId].tenant == ZERO_ADDRESS
+    self._mintProperty(msg.sender, _propertyId)
+    self.propertyLedger[_propertyId].price = _price
+    self.propertyPercentage[_propertyId][msg.sender] = 100
+    self.propertyForSale[_propertyId] = True
+
+
+@external
+def sellFullProperty(_propertyId: uint256, newOwner: address):
+    assert self.propertyForSale[_propertyId] == True, "This property is not for sale"
+    assert self.propertyLedger[_propertyId].owner == msg.sender
+    assert self.propertyPercentage[_propertyId][msg.sender] == 100
+
 
 @external
 def approveBroker(broker: address):
