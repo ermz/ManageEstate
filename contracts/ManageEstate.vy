@@ -270,6 +270,26 @@ def _propertyPerShareCost(_propertyId: uint256) -> uint256:
     assert currentPropertyPrice > 0, "This property is not up for sale"
     return currentPropertyPrice / 100
 
+# Will transfer ownership to the majority owner of property
+# This will be called anytime part of a property are called
+# Have to add caveat if there is a tie in ownership percentage
+@internal
+def _transferOwnership(_propertyId: uint256):
+    currentOwner: address = self.propertyLedger[_propertyId].owner
+    majorityOwner: address = ZERO_ADDRESS
+    largestPercentage: uint256 = 0
+    currentOwners: address[10] = self.propertyOwners[_propertyId]
+    for i in range(0, 9):
+        if currentOwners[i] != ZERO_ADDRESS:
+            if self.propertyPercentage[_propertyId][currentOwners[i]] > largestPercentage:
+                majorityOwner = currentOwners[i]
+                largestPercentage = self.propertyPercentage[_propertyId][currentOwners[i]]
+        elif currentOwners[i] == ZERO_ADDRESS:
+            pass
+    self._transferFrom(majorityOwner, currentOwner, _propertyId, currentOwner)
+
+
+
 @payable
 @external
 def buyProperty(_propertyId: uint256, _owner: address, _percentage: uint256):
