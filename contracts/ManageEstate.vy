@@ -244,25 +244,43 @@ def _mintProperty(_to: address, _tokenId: uint256) -> bool:
 
 # PropertyId to Address and Percentage they own
 propertyPercentage: HashMap[uint256, HashMap[address, uint256]]
-propertyForSale: HashMap[uint256, bool]
+# Whether property is up for sale by who and what percentage
+propertyForSale: HashMap[uint256, HashMap[address, uint256]]
+# There is a limit of 10 owners per property
+propertyOwners: HashMap[uint256, address[10]]
 
 @external
-def makePropertySellable(_propertyId: uint256, _price: uint256):
+def makePropertySellable(_propertyId: uint256, _price: uint256, _percentage: uint256):
     assert self.propertyLedger[_propertyId].price == 0, "This property is already up for sale"
     assert self.propertyLedger[_propertyId].owner == msg.sender
     assert self.propertyLedger[_propertyId].tenant == ZERO_ADDRESS
     self._mintProperty(msg.sender, _propertyId)
     self.propertyLedger[_propertyId].price = _price
     self.propertyPercentage[_propertyId][msg.sender] = 100
-    self.propertyForSale[_propertyId] = True
-
+    self.propertyForSale[_propertyId][msg.sender] = _percentage
 
 @external
-def sellFullProperty(_propertyId: uint256, newOwner: address):
-    assert self.propertyForSale[_propertyId] == True, "This property is not for sale"
-    assert self.propertyLedger[_propertyId].owner == msg.sender
-    assert self.propertyPercentage[_propertyId][msg.sender] == 100
+def sellPropertyPercentage(_propertyId: uint256, _percentage: uint256):
+    assert self.propertyPercentage[_propertyId][msg.sender] >= _percentage, "You can't sell more than what you own"
+    self.propertyForSale[_propertyId][msg.sender] = _percentage
 
+@internal
+def _propertyPerShareCost(_propertyId: uint256) -> uint256:
+    currentPropertyPrice: uint256 = self.propertyLedger[_propertyId].price
+    assert currentPropertyPrice > 0, "This property is not up for sale"
+    return currentPropertyPrice / 100
+
+@payable
+@external
+def buyProperty(_propertyId: uint256, _owner: address, _percentage: uint256):
+    assert self.propertyForSale[_propertyId][_owner] >= _percentage, "This property is not for sale or you can't purchase more than it's being sold"
+    assert self.propertyOwners[_propertyId][9] == ZERO_ADDRESS, "The limit for owners has been reached"
+    assert msg.value >= as_wei_value(self._propertyPerShareCost(_propertyId) * _percentage, "ether")
+    for i in range(0, 9):
+        if self.propertyOwners[_propertyId][i] == ZERO_ADDRESS:
+            self.propertyOwners[_propertyId][i] = msg.sender
+            self.propertyPercentage[_propertyId][_owner] -= _percentage
+            self.propertyPercentage[_propertyId][msg.sender] += _percentage
 
 @external
 def approveBroker(broker: address):
