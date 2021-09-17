@@ -1,8 +1,8 @@
 # @version >=0.2.7 <0.3.0
 
-# from vyper.interfaces import ERC721
+from vyper.interfaces import ERC721
 
-# implements: ERC721
+implements: ERC721
 
 interface ERC721Receiver:
     def onERC721Received(
@@ -288,6 +288,11 @@ def _transferOwnership(_propertyId: uint256):
             pass
     self._transferFrom(majorityOwner, currentOwner, _propertyId, currentOwner)
 
+@internal
+def _closingDistribution(_amount: uint256, _owner: address) -> uint256:
+    earningsAsDecimal: decimal = convert(_amount, decimal)
+    ownerEarnings: decimal = earningsAsDecimal * 0.97
+    return convert(ownerEarnings, uint256)
 
 
 @payable
@@ -295,12 +300,18 @@ def _transferOwnership(_propertyId: uint256):
 def buyProperty(_propertyId: uint256, _owner: address, _percentage: uint256):
     assert self.propertyForSale[_propertyId][_owner] >= _percentage, "This property is not for sale or you can't purchase more than it's being sold"
     assert self.propertyOwners[_propertyId][9] == ZERO_ADDRESS, "The limit for owners has been reached"
-    assert msg.value >= as_wei_value(self._propertyPerShareCost(_propertyId) * _percentage, "ether")
+    assert msg.value >= as_wei_value(self._propertyPerShareCost(_propertyId) * _percentage, "ether") + APPLICATION_FEE
     for i in range(0, 9):
         if self.propertyOwners[_propertyId][i] == ZERO_ADDRESS:
             self.propertyOwners[_propertyId][i] = msg.sender
             self.propertyPercentage[_propertyId][_owner] -= _percentage
             self.propertyPercentage[_propertyId][msg.sender] += _percentage
+    self._transferOwnership(_propertyId)
+    ownerEarnings: uint256 = self._closingDistribution(msg.value, _owner)
+    send(_owner, as_wei_value(ownerEarnings, "ether"))
+    log EtherTransfer(msg.sender, self, msg.value)
+    log EtherTransfer(self, _owner, ownerEarnings)
+    
 
 @external
 def approveBroker(broker: address):
