@@ -246,6 +246,11 @@ def addProperty(_direction: String[50], _unit: String[10], _rent: uint256):
     })
     self.propertyId += 1
 
+@external
+@view
+def viewProperty(_propertyId: uint256) -> Property:
+    return self.propertyLedger[_propertyId]
+
 # Callable only by property owners already
 @internal
 def _mintProperty(_to: address, _tokenId: uint256) -> bool:
@@ -347,7 +352,7 @@ def removeAgents(agent: address):
 def checkAgent(agent: address, broker: address, propertyId: uint256) -> bool:
     propertyOwner: address = self.propertyLedger[propertyId].owner
     assert self.brokerApprove[broker][propertyOwner] == True, "This broker does not have access to this unit"
-    assert self.agentLedger[agent] == broker, "This agent is sponsored by this broker"
+    assert self.agentLedger[agent] == broker, "This agent is not sponsored by this broker"
     return True
 
 @payable
