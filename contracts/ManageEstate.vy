@@ -216,10 +216,22 @@ def addLandlord(addr: address):
     assert msg.sender == self.admin
     self.landlordList[addr] = True
 
+@view
+@external
+def realLandlord(addr: address) -> bool:
+    assert self.brokerList[msg.sender] == True, "Only a broker may request this information"
+    return self.landlordList[addr]
+
 @external
 def addBroker(addr: address):
     assert msg.sender == self.admin
     self.brokerList[addr] = True
+
+@view
+@external
+def realBroker(addr: address) -> bool:
+    assert self.landlordList[msg.sender] == True, "Only a landlord may request this information"
+    return self.brokerList[addr]
 
 @external
 def addProperty(_direction: String[50], _unit: String[10], _rent: uint256):
