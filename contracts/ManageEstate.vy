@@ -378,7 +378,7 @@ def applyAsTenant(_propertyId: uint256, _startDate: uint256, _monthsFree: uint25
 def applyAsBroker(_propertyId: uint256, _startDate: uint256, _monthsFree: uint256, months: uint256, _tenant: address, _brokerFee: uint256):
     property_owner: address = self.propertyLedger[_propertyId].owner
     assert self.brokerApprove[msg.sender][property_owner] == True, "You don't work with this landlord. Contact landlord for access"
-    assert 2 * as_wei_value(self.propertyLedger[_propertyId].rent, "ether") + APPLICATION_FEE >= msg.value, "This won't cover enough for application"
+    assert msg.value >= (APPLICATION_FEE + (as_wei_value(self.propertyLedger[_propertyId].rent, "ether") * 2 )), "This won't cover enough for app fee and two months of rent"
     self.applicationLedger[_propertyId] = Application({
         tenant: _tenant,
         propertyId: _propertyId,
