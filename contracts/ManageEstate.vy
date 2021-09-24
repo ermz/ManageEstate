@@ -359,7 +359,8 @@ def checkAgent(agent: address, broker: address, propertyId: uint256) -> bool:
 @external
 def applyAsTenant(_propertyId: uint256, _startDate: uint256, _monthsFree: uint256, months: uint256):
     # Payment is two months up front(1st month rent and security deposit) + application fee
-    assert 2 * as_wei_value(self.propertyLedger[_propertyId].rent, "ether") + APPLICATION_FEE >= msg.value, "You must transfer enough to cover app fee and 1 month rent"
+    # assert 2 * as_wei_value(self.propertyLedger[_propertyId].rent, "ether") + APPLICATION_FEE >= msg.value, "You must transfer enough to cover app fee and 1 month rent"
+    assert msg.value >= (APPLICATION_FEE + (as_wei_value(self.propertyLedger[_propertyId].rent, "ether") * 2 )), "You must transfer enough to cover 2 months of rent and app fee"
     self.applicationLedger[_propertyId] = Application({
         tenant: msg.sender,
         propertyId: _propertyId,
