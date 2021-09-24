@@ -433,10 +433,11 @@ def withdrawSecurityDeposit(_propertyId: uint256):
 @external
 def subletRental(_propertyId: uint256, _newTenant: address, _length: uint256):
     property_application: Application = self.applicationLedger[_propertyId]
-    assert property_application.tenant == msg.sender
-    assert property_application.approved == True
-    assert property_application.startDate + property_application.length > block.timestamp + _length, "Sublease length must be less than the total time of original lease"
-    self.subtenantLedger[_propertyId][_newTenant] = _length
+    assert property_application.tenant == msg.sender, "You are not the current tenant"
+    assert property_application.approved == True, "This property is not being rented by tenant"
+    assert property_application.startDate <= block.timestamp, "This lease hasn't started yet"
+    assert property_application.startDate + (property_application.length * 2629743) > block.timestamp + (_length * 2629743), "Sublease length must be less than the total time of original lease"
+    self.subtenantLedger[_propertyId][_newTenant] = block.timestamp + (_length * 2629743)
 
 @payable
 @external
