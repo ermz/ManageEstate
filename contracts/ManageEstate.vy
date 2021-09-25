@@ -430,6 +430,8 @@ def withdrawSecurityDeposit(_propertyId: uint256):
     log EtherTransfer(self, msg.sender, self.propertyLedger[_propertyId].rent)
 
 
+# Change _length to be one of three options, that are in unix time
+# Maybe keep the method of calculation by month
 @external
 def subletRental(_propertyId: uint256, _newTenant: address, _length: uint256):
     property_application: Application = self.applicationLedger[_propertyId]
@@ -439,10 +441,11 @@ def subletRental(_propertyId: uint256, _newTenant: address, _length: uint256):
     assert property_application.startDate + (property_application.length * 2629743) > block.timestamp + (_length * 2629743), "Sublease length must be less than the total time of original lease"
     self.subtenantLedger[_propertyId][_newTenant] = block.timestamp + (_length * 2629743)
 
+# Subtenant can pay rent only while their lease is ongoing
 @payable
 @external
 def payRent(_propertyId: uint256):
-    assert self.propertyLedger[_propertyId].tenant == msg.sender or self.subtenantLedger[_propertyId][msg.sender] > 0, "You are not renting this unit or subleasing this unit"
+    assert self.applicationLedger[_propertyId].tenant == msg.sender or self.subtenantLedger[_propertyId][msg.sender] >= block.timestamp, "You are not renting this unit or subleasing this unit"
     assert as_wei_value(self.propertyLedger[_propertyId].rent, "ether") <= msg.value, "You aren't sending enough to cover rent"
     send(self.propertyLedger[_propertyId].owner, as_wei_value(self.propertyLedger[_propertyId].rent, "ether"))
     log EtherTransfer(msg.sender, self.propertyLedger[_propertyId].owner, msg.value)
