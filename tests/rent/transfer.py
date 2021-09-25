@@ -1,6 +1,7 @@
 import pytest
 from brownie import accounts, chain, ZERO_ADDRESS
 import brownie
+import time
 
 # chain.sleep might not be necessary in this scenario
 # There's nothing preventing users from paying before lease starts
@@ -21,3 +22,6 @@ def test_subtenant_pay_rent(_estate_3, dom, ed, fin, gary):
     _estate_3.payRent(1, {"from": accounts[9], "value": "1 ether"})
     assert original_account9_balance - "1 ether" == accounts[9].balance()
 
+def test_withdraw_broker_fee(_estate_3, dom, ed, fin, gary):
+    
+    assert int(time.time()) > 1

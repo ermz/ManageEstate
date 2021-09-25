@@ -1,6 +1,7 @@
 import pytest
 from brownie import ZERO_ADDRESS, accounts, chain
 import brownie
+import time
 
 def test_apply_as_tenant(_estate_2, ed, huck):
     with brownie.reverts("You must transfer enough to cover 2 months of rent and app fee"):
@@ -34,7 +35,7 @@ def test_approve_application(_estate_2, dom, ed, fin, huck):
 
 # These sublet test may fail later, must update startTime of lease
 def test_sublet_rental(_estate_2, ed, fin, huck):
-    _estate_2.applyAsTenant(1, 1632618124, 0, 6, {"from": huck, "value": "3 ether"})
+    _estate_2.applyAsTenant(1, (int(time.time()) + 86400), 0, 6, {"from": huck, "value": "3 ether"})
     with brownie.reverts("This property is not being rented by tenant"):
         _estate_2.subletRental(1, fin, 86400, {"from": huck})
     _estate_2.approveApplication(1, {"from": ed})
@@ -44,7 +45,7 @@ def test_sublet_rental(_estate_2, ed, fin, huck):
     _estate_2.subletRental(1, fin, 2, {"from": huck})
 
 def test_invalid_sublet_rental(_estate_2, ed, fin, huck):
-    _estate_2.applyAsTenant(1, 1632529443, 0, 2, {"from": huck, "value": "3 ether"})
+    _estate_2.applyAsTenant(1, (int(time.time()) + 86400), 0, 3, {"from": huck, "value": "3 ether"})
     _estate_2.approveApplication(1, {"from": ed})
     with brownie.reverts():
         _estate_2.subletRental(1, fin, 3_259_486, {"from": huck})
