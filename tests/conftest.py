@@ -1,5 +1,5 @@
 import pytest
-from brownie import accounts, ManageEstate
+from brownie import accounts, ManageEstate, chain
 import time
 
 @pytest.fixture()
@@ -56,6 +56,7 @@ def _estate_3(dom, ed, fin, gary):
     _estate_3.addBroker(fin, {"from": dom})
     _estate_3.addProperty("37-07 147th St", "5F", 1, {"from": ed})
     _estate_3.approveBroker(fin, {"from": ed})
-    _estate_3.applyAsBroker(1, (int(time.time() + 86400)), 0, 4, gary, 1, {"from": fin, "value": "3 ether"})
+    _start_time = chain.time() + 86400
+    _estate_3.applyAsBroker(1, _start_time, 0, 4, gary, 1, {"from": fin, "value": "3 ether"})
     _estate_3.approveApplication(1, {"from": ed})
     return _estate_3

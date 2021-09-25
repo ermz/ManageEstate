@@ -33,20 +33,20 @@ def test_approve_application(_estate_2, dom, ed, fin, huck):
     assert _estate_2.viewApplication(1, {"from": ed})["approved"] == True
     assert original_contract_balance == _estate_2.balance() + "1 ether"
 
-# These sublet test may fail later, must update startTime of lease
 def test_sublet_rental(_estate_2, ed, fin, huck):
-    _estate_2.applyAsTenant(1, (int(time.time()) + 86400), 0, 6, {"from": huck, "value": "3 ether"})
+    _estate_2.applyAsTenant(1, (chain.time() + 86400), 0, 6, {"from": huck, "value": "3 ether"})
     with brownie.reverts("This property is not being rented by tenant"):
         _estate_2.subletRental(1, fin, 86400, {"from": huck})
     _estate_2.approveApplication(1, {"from": ed})
     with brownie.reverts("You are not the current tenant"):
         _estate_2.subletRental(1, fin, 86400, {"from": accounts[9]})
-    chain.sleep(2629743)
+    chain.sleep(86401)
     _estate_2.subletRental(1, fin, 2, {"from": huck})
 
 def test_invalid_sublet_rental(_estate_2, ed, fin, huck):
-    _estate_2.applyAsTenant(1, (int(time.time()) + 86400), 0, 3, {"from": huck, "value": "3 ether"})
+    _estate_2.applyAsTenant(1, (chain.time() + 86400), 0, 3, {"from": huck, "value": "3 ether"})
     _estate_2.approveApplication(1, {"from": ed})
     with brownie.reverts():
         _estate_2.subletRental(1, fin, 3_259_486, {"from": huck})
+    chain.sleep(86401)
     _estate_2.subletRental(1, fin, 1, {"from": huck})

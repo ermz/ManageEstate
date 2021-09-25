@@ -411,9 +411,9 @@ def approveApplication(_propertyId: uint256):
 @external
 def withdrawBrokerFee(_propertyId: uint256):
     property_application: Application = self.applicationLedger[_propertyId]
-    assert property_application.broker == msg.sender
+    assert property_application.broker == msg.sender, "You are not the broker of this transaction"
     assert property_application.brokerFee > 0, "Nothing to collect or already collected"
-    assert property_application.approved == True
+    assert property_application.approved == True, "This application hasn't been approved yet"
     assert property_application.startDate <= block.timestamp, "You can only withdraw funds once tenants have moved into their new unit"
     send(msg.sender, as_wei_value(property_application.brokerFee, "ether"))
     self.applicationLedger[_propertyId].brokerFee = 0
@@ -423,8 +423,8 @@ def withdrawBrokerFee(_propertyId: uint256):
 def withdrawSecurityDeposit(_propertyId: uint256):
     property_application: Application = self.applicationLedger[_propertyId]
     assert property_application.tenant == msg.sender, "You are either no the tenant or you already collected you security deposit"
-    assert property_application.approved == True
-    assert property_application.startDate + property_application.length <= block.timestamp, "You can only withdraw your deposit once you're lease is up"
+    assert property_application.approved == True, "This application was never approved"
+    assert property_application.startDate + (property_application.length * 2629743) <= block.timestamp, "You can only withdraw your deposit once you're lease is up"
     send(msg.sender, as_wei_value(self.propertyLedger[_propertyId].rent, "ether"))
     self.applicationLedger[_propertyId].tenant = ZERO_ADDRESS
     log EtherTransfer(self, msg.sender, self.propertyLedger[_propertyId].rent)
