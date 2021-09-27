@@ -109,7 +109,7 @@ def balanceOf(_owner: address) -> uint256:
 @external
 def ownerOf(_tokenId: uint256) -> address:
     owner: address = self.idToOwner[_tokenId]
-    assert owner != ZERO_ADDRESS
+    assert owner != ZERO_ADDRESS, "There is no owner yet"
     return owner
 
 @view
@@ -269,8 +269,8 @@ propertyOwners: HashMap[uint256, address[10]]
 @external
 def makePropertySellable(_propertyId: uint256, _price: uint256, _percentage: uint256):
     assert self.propertyLedger[_propertyId].price == 0, "This property is already up for sale"
-    assert self.propertyLedger[_propertyId].owner == msg.sender
-    assert self.propertyLedger[_propertyId].tenant == ZERO_ADDRESS
+    assert self.propertyLedger[_propertyId].owner == msg.sender, "Only owner"
+    assert self.applicationLedger[_propertyId].tenant == ZERO_ADDRESS, "Tenant occupied"
     self._mintProperty(msg.sender, _propertyId)
     self.propertyLedger[_propertyId].price = _price
     self.propertyPercentage[_propertyId][msg.sender] = 100
