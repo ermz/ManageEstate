@@ -308,12 +308,12 @@ def _transferOwnership(_propertyId: uint256):
                 largestPercentage = self.propertyPercentage[_propertyId][currentOwners[i]]
         elif currentOwners[i] == ZERO_ADDRESS:
             pass
-    self._transferFrom(majorityOwner, currentOwner, _propertyId, currentOwner)
+    self._transferFrom(currentOwner, majorityOwner, _propertyId, currentOwner)
 
 @internal
 def _closingDistribution(_amount: uint256, _owner: address) -> uint256:
     earningsAsDecimal: decimal = convert(_amount, decimal)
-    ownerEarnings: decimal = earningsAsDecimal * 0.97
+    ownerEarnings: decimal = (earningsAsDecimal / 1000000000000000000.0) * 0.97
     return convert(ownerEarnings, uint256)
 
 
@@ -322,7 +322,7 @@ def _closingDistribution(_amount: uint256, _owner: address) -> uint256:
 def buyProperty(_propertyId: uint256, _owner: address, _percentage: uint256):
     assert self.propertyForSale[_propertyId][_owner] >= _percentage, "This property is not for sale or you can't purchase more than it's being sold"
     assert self.propertyOwners[_propertyId][9] == ZERO_ADDRESS, "The limit for owners has been reached"
-    assert msg.value >= as_wei_value(self._propertyPerShareCost(_propertyId) * _percentage, "ether") + APPLICATION_FEE
+    assert msg.value >= as_wei_value(self._propertyPerShareCost(_propertyId) * _percentage, "ether") + APPLICATION_FEE, "Not enough to cover cost of property"
     for i in range(0, 9):
         if self.propertyOwners[_propertyId][i] == ZERO_ADDRESS:
             self.propertyOwners[_propertyId][i] = msg.sender
