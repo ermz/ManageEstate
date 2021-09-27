@@ -281,6 +281,11 @@ def sellPropertyPercentage(_propertyId: uint256, _percentage: uint256):
     assert self.propertyPercentage[_propertyId][msg.sender] >= _percentage, "You can't sell more than what you own"
     self.propertyForSale[_propertyId][msg.sender] = _percentage
 
+@view
+@external
+def viewPropertyForSale(_propertyId: uint256, _owner: address) -> uint256:
+    return self.propertyForSale[_propertyId][_owner]
+
 @internal
 def _propertyPerShareCost(_propertyId: uint256) -> uint256:
     currentPropertyPrice: uint256 = self.propertyLedger[_propertyId].price
